@@ -1597,6 +1597,40 @@ void check_zero_no_flush_custom_scalar() {
   VERIFY(!numext::is_exactly_zero_no_flush(EqualityOnly(1)));
 }
 
+namespace partial_limits_test {
+struct Scalar {
+  double v;
+  explicit Scalar(double x = 0.0) : v(x) {}
+  bool operator==(const Scalar& other) const { return v == other.v; }
+};
+}  // namespace partial_limits_test
+
+namespace std {
+template <>
+class numeric_limits<partial_limits_test::Scalar> {
+ public:
+  static constexpr bool is_specialized = true;
+  static constexpr bool is_signed = true;
+  static constexpr bool is_integer = false;
+};
+}  // namespace std
+
+void check_partial_numeric_limits_traits() {
+  using S = partial_limits_test::Scalar;
+  STATIC_CHECK(!internal::has_iec559_binary_encoding<S>::value);
+  STATIC_CHECK(!internal::supports_power_of_two_scaling<S>::value);
+  STATIC_CHECK(!internal::twoprod_full_range_uses_dekker<S>::value);
+  STATIC_CHECK(!internal::use_scaled_comparison<S>::value);
+  STATIC_CHECK(!internal::unary_pow::is_double_word_base<S>::value);
+  STATIC_CHECK(!internal::triangular_solve_packet_traits<S>::Enabled);
+#ifndef _MSC_VER
+  STATIC_CHECK(!internal::use_scaled_comparison<std::complex<S>>::value);
+  STATIC_CHECK(!internal::unary_pow::is_double_word_base<std::complex<S>>::value);
+#endif
+  VERIFY(numext::is_exactly_zero_no_flush(S(0.0)));
+  VERIFY(!numext::is_exactly_zero_no_flush(S(1.0)));
+}
+
 template <typename Scalar>
 EIGEN_DONT_INLINE bool zero_no_flush_predicate(Scalar value) {
   return numext::is_exactly_zero_no_flush(value);
@@ -2003,6 +2037,7 @@ EIGEN_DECLARE_TEST(numext) {
     CALL_SUBTEST_1(check_zero_no_flush<float>());
     CALL_SUBTEST_1(check_zero_no_flush<double>());
     CALL_SUBTEST_1(check_zero_no_flush_custom_scalar());
+    CALL_SUBTEST_1(check_partial_numeric_limits_traits());
     CALL_SUBTEST_1(check_binary_floating_point_traits_odr_use<half>());
     CALL_SUBTEST_1(check_binary_floating_point_traits_odr_use<bfloat16>());
     CALL_SUBTEST_1(check_binary_floating_point_traits_odr_use<float>());
